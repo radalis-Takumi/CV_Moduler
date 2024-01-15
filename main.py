@@ -18,8 +18,13 @@ def main():
     # 顔検出器を登録
     stream.register_FD("onnx/yunet_n_320_320.onnx")
 
+    # 顔認識器を登録
+    stream.register_FR("onnx/face_recognizer_fast.onnx")
+
+    stream.save_face('./faces')
+
     # 画像を描画
-    stream.run(FD_flag=True)
+    # stream.run(FD_flag=True)
 
 
 
