@@ -41,6 +41,16 @@ class Stream:
     def register_FD(self, weights, dir='./'):
         # モデルを読み込む
         self.face_detector = FaceDetector(weights, dir, (self.width, self.height))
+    
+    def detect(self, json=False):
+        # 顔を検出する
+        faces = self.face_detector.detect(self.frame)
+
+        # JSONにする
+        if json:
+            faces = [self.face_detector.convert_ndaary2json(face) for face in faces]
+            
+        return faces
 
     def run(self, window_name='window', windowSizeVariable=False, FD_flag=False, delay=1):
         # フレームの描画を行う
@@ -116,6 +126,38 @@ class FaceDetector:
         faces = faces if faces is not None else []
 
         return faces
+    
+    def convert_ndaary2json(self, face: list):
+        # データリストを辞書にする
+        fase_data = list(map(int, face[:-1]))
+        conf = float(face[-1])
+        return {
+            'bb': {
+                'x': fase_data[0], 'y': fase_data[1], 'w': fase_data[2], 'h': fase_data[3]
+            },
+            'randmark': {
+                'eye': {
+                    'r_x': fase_data[4], 'r_y': fase_data[5], 'l_x': fase_data[6], 'l_y': fase_data[7]
+                },
+                'nose': {
+                    'x': fase_data[8], 'y': fase_data[9]
+                },
+                'mouse': {
+                    'r_x': fase_data[10], 'r_y': fase_data[11], 'l_x': fase_data[12], 'l_y': fase_data[13]
+                }
+            },
+            'conf': conf
+        }
+    
+    def convert_json2ndaary(self, face: dict):
+        # 顔情報辞書をリストにする
+        return np.array([
+            *list(face['bb'].values()),
+            *list(face['randmark']['eye'].values()),
+            *list(face['randmark']['nose'].values()),
+            *list(face['randmark']['mouse'].values()),
+            face['conf']
+        ])
 
     def draw_result(self, frame, faces: np.ndarray, bb=True, randmark=True, confidence=True):
         # 検出した顔のバウンディングボックスとランドマークを描画する
