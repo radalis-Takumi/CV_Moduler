@@ -1,6 +1,8 @@
 import sys
 import cv2
 import numpy as np
+import glob
+from pathlib import Path
 
 from .face_detector import FaceDetector
 from .face_recognizer import FaceRecognizer
@@ -51,6 +53,48 @@ class Stream:
         # モデルを読み込む
         self.face_recognizer = FaceRecognizer(weights, dir)
 
+        # 特徴量リストを初期化する
+        self.reset_feature_DB()
+    
+    def load_feature_DB(self, path='./'):
+        # パスの存在確認.無ければ戻る.
+        p_path = Path(path)
+        if not p_path.exists():
+            return
+
+        # pathのリストを用意
+        if p_path.is_file():
+            files = [str(p_path)]
+        else:
+            files = glob.glob(p_path.joinpath('*.npy'))
+        
+        # npyファイルを読み込む
+        for file in files:
+            self.feature_DB.append({
+                'userID': Path(file).stem,
+                'feature': np.load(file)
+            })
+    
+    def reset_feature_DB(self):
+        # 特徴量リストを初期化する
+        self.feature_DB = []
+    
+    def remove_feature_DB(self, key: int | str):
+        # DBが存在しなければ戻る
+        if not self.feature_DB:
+            return
+
+        # key指定がインデックスの場合
+        if type(key) is int and key < len(self.feature_DB):
+            self.feature_DB.pop(key)
+        
+        # key指定が文字列（userID）の時
+        elif type(key) is str:
+            for i, feature in enumerate(self.feature_DB):
+                if feature['userID'] == key:
+                    self.feature_DB.pop(i)
+                    break
+
     def detect(self, json=False):
         if self.face_detector:
             # 顔を検出する
@@ -65,15 +109,46 @@ class Stream:
         else:
             return []
     
-    def save_face(self, dir: str, image_dir='img', feature_dir='feature', name_list: list = None):
+    def recognize(self):
         if self.face_recognizer:
             # 顔を検出する
             faces = self.detect()
 
-            # 顔画像を切り抜いて保存する
+            # 検出された顔を切り抜く
             aligned_faces = self.face_recognizer.faces_alignCrop(self.frame, faces)
-            self.face_recognizer.save_face(dir, aligned_faces, name_list)
+            
+            # 特徴を抽出する
+            features = self.face_recognizer.get_features(aligned_faces)
+            
+            # DBと照合する
+            return self.face_recognizer.recognize(features, self.feature_DB)
+        
+        else:
+            return []
+    
+    def save_face(self, dir: str, image_dir='img', feature_dir='feature',
+                  image_name_list: list = None, feature_name_list: list = None):
+        # image_dir, feature_dirどちらか指定されている場合
+        if self.face_recognizer and (image_dir or feature_dir):
+            # dirのパスのディレクトリが存在することを確認し、無ければ作成する
+            p_file = Path(dir)
+            if not p_file.exists():
+                p_file.mkdir()
 
+            # 顔を検出する
+            faces = self.detect()
+
+            # 顔画像を切り抜く
+            aligned_faces = self.face_recognizer.faces_alignCrop(self.frame, faces)
+
+            # 顔画像を保存する
+            if image_dir:
+                self.face_recognizer.save_faces(p_file.joinpath(image_dir), aligned_faces, image_name_list)
+
+            # 特徴量を保存する
+            if feature_dir:
+                features = self.face_recognizer.get_features(aligned_faces)
+                self.face_recognizer.save_features(p_file.joinpath(feature_dir), features, feature_name_list)
 
     def run(self, window_name='window', windowSizeVariable=False, FD_flag=False, delay=1):
         # フレームの描画を行う
