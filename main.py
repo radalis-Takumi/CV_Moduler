@@ -21,10 +21,14 @@ def main():
     # 顔認識器を登録
     stream.register_FR("onnx/face_recognizer_fast.onnx")
 
-    stream.save_face('./faces')
+    # 特徴量を読み込む
+    stream.load_feature_DB('./faces/feature')
+
+    # 顔の画像と特徴量を保存する
+    # stream.save_face('./faces')
 
     # 画像を描画
-    # stream.run(FD_flag=True)
+    stream.run(FD_flag=True, FR_flag=True, randmark=False)
 
 
 

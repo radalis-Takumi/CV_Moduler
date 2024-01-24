@@ -66,7 +66,7 @@ class Stream:
         if p_path.is_file():
             files = [str(p_path)]
         else:
-            files = glob.glob(p_path.joinpath('*.npy'))
+            files = glob.glob(str(p_path.joinpath('*.npy')))
         
         # npyファイルを読み込む
         for file in files:
@@ -95,13 +95,13 @@ class Stream:
                     self.feature_DB.pop(i)
                     break
 
-    def detect(self, json=False):
+    def detect(self, res_json=False):
         if self.face_detector:
             # 顔を検出する
             faces = self.face_detector.detect(self.frame)
 
             # JSONにする
-            if json:
+            if res_json:
                 faces = [self.face_detector.convert_ndaary2json(face) for face in faces]
                 
             return faces
@@ -109,10 +109,11 @@ class Stream:
         else:
             return []
     
-    def recognize(self):
+    def recognize(self, faces: list = None):
         if self.face_recognizer:
-            # 顔を検出する
-            faces = self.detect()
+            # facesの入力がない場合、顔を検出する
+            if faces is None:
+                faces = self.detect()
 
             # 検出された顔を切り抜く
             aligned_faces = self.face_recognizer.faces_alignCrop(self.frame, faces)
@@ -150,9 +151,10 @@ class Stream:
                 features = self.face_recognizer.get_features(aligned_faces)
                 self.face_recognizer.save_features(p_file.joinpath(feature_dir), features, feature_name_list)
 
-    def run(self, window_name='window', windowSizeVariable=False, FD_flag=False, delay=1):
+    def run(self, window_name='window', windowSizeVariable=False, FD_flag=False, FR_flag=False, delay=1,
+            bb=True, randmark=True, confidence=True, recognition=True):
         # フレームの描画を行う
-        self.__preset_run(window_name, windowSizeVariable, FD_flag)
+        self.__preset_run(window_name, windowSizeVariable, FD_flag, FR_flag, bb, randmark, confidence, recognition)
 
         if self.input_type == self.INPUT_TYPE.FILE:
             self.__run_image()
@@ -160,9 +162,15 @@ class Stream:
         elif self.input_type == self.INPUT_TYPE.CAMERA:
             self.__run_video(delay)
     
-    def __preset_run(self, window_name, windowSizeVariable, FD_flag):
+    def __preset_run(self, window_name, windowSizeVariable, FD_flag, FR_flag,
+                     bb=True, randmark=True, confidence=True, recognition=True):
         self.window_name = window_name
         self.FD_flag = FD_flag
+        self.FR_flag = FR_flag
+        self.Draw_flag_bb = bb
+        self.Draw_flag_randmark = randmark
+        self.Draw_flag_confidence = confidence
+        self.Draw_flag_recognition = recognition
         windowFlag = cv2.WINDOW_NORMAL if windowSizeVariable else cv2.WINDOW_AUTOSIZE
         cv2.namedWindow(self.window_name, windowFlag)
     
@@ -172,14 +180,36 @@ class Stream:
             return True
         except:
             return False
+    
+    def __draw_detect(self, faces: list, bb=True, randmark=True, confidence=True):
+        # 検出した顔のバウンディングボックスとランドマークを描画する
+        if self.face_detector:
+            self.face_detector.draw_result(self.frame, faces, bb, randmark, confidence)
 
-    def __run_image(self):
-        if self.FD_flag and self.face_detector:
+    def __draw_recognize(self, faces: list, recognize_results: list, bb=True, recognition=True):
+        # 認証した顔のバウンディングボックスとIDを描画する
+        if self.face_recognizer:
+            self.face_recognizer.draw_result(self.frame, faces, recognize_results, bb, recognition)
+    
+    def __draw_result(self):
+        if (self.FD_flag or self.FR_flag):
             # 顔を検出する
-            faces = self.face_detector.detect(self.frame)
+            faces = self.detect()
 
             # 検出した顔のバウンディングボックスとランドマークを描画する
-            self.face_detector.draw_result(self.frame, faces)
+            self.__draw_detect(faces, bb=self.Draw_flag_bb, randmark=self.Draw_flag_randmark, confidence=self.Draw_flag_confidence)
+        
+        if self.FR_flag:
+            # 顔認証を行う
+            recognize_results = self.recognize(faces)
+
+            # 認証結果を描画する
+            self.__draw_recognize(faces, recognize_results, bb=False, recognition=self.Draw_flag_recognition)
+
+
+    def __run_image(self):
+        # 解析結果を描画
+        self.__draw_result()
 
         cv2.imshow(self.window_name, self.frame)
         cv2.waitKey(0)
@@ -191,12 +221,8 @@ class Stream:
             # フレームをキャプチャして画像を読み込む
             res, self.frame = self.capture.read()
             if res:
-                if self.FD_flag and self.face_detector:
-                    # 顔を検出する
-                    faces = self.face_detector.detect(self.frame)
-
-                    # 検出した顔のバウンディングボックスとランドマークを描画する
-                    self.face_detector.draw_result(self.frame, faces)
+                # 解析結果を描画
+                self.__draw_result()
 
                 cv2.imshow(self.window_name, self.frame)
                 cv2.waitKey(delay)

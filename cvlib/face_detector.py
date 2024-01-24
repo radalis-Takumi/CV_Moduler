@@ -52,13 +52,13 @@ class FaceDetector:
         ])
 
     def draw_result(self, frame, faces: np.ndarray, bb=True, randmark=True, confidence=True):
+        # 描画設定
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        color = (0, 0, 255)
+        lineType = cv2.LINE_AA
+        
         # 検出した顔のバウンディングボックスとランドマークを描画する
         for i, face in enumerate(faces):
-            # 描画設定
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            color = (0, 0, 255)
-            lineType = cv2.LINE_AA
-
             # バウンディングボックス
             if bb:
                 box = list(map(int, face[:4]))
@@ -74,6 +74,7 @@ class FaceDetector:
             # 信頼度
             if confidence:
                 conf = f"{round(float(face[-1]), 2)}"
-                position = (int(face[0]), int(face[1]) - 10)
+                position = (int(face[0]), int(face[1] + face[3]) + 10)
                 cv2.putText(frame, conf, position, font, fontScale=0.5, color=color, thickness=2, lineType=lineType)
        
+        return frame

@@ -67,7 +67,30 @@ class FaceRecognizer:
             return best_match
         
         else:
-            if score > self.COSINE_THRESHOLD:
+            if best_match['score'] > self.COSINE_THRESHOLD:
                 return best_match
             else:
                 return {'userID': '', 'score': 0.0}
+
+    def draw_result(self, frame, faces: np.ndarray, recognize_results: list, bb=True, recognition=True):
+        # 描画設定
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        color = (0, 0, 255)
+        lineType = cv2.LINE_AA
+
+        for face, recognize_result in zip(faces, recognize_results):
+            # バウンディングボックス
+            if bb:
+                box = list(map(int, face[:4]))
+                cv2.rectangle(frame, box, color=color, thickness=2, lineType=lineType)
+
+            # 認識の結果を描画する
+            if recognition:
+                userID = recognize_result['userID'] if recognize_result['userID'] else 'unknown'
+                score = recognize_result['score']
+                text = f"{userID} ({round(score, 3)})"
+                box = list(map(int, face[:2]))
+                position = (box[0], box[1] - 10)
+                cv2.putText(frame, text, position, font, fontScale=0.6, color=color, thickness=2, lineType=lineType)
+    
+        return frame
